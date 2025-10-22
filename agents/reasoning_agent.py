@@ -1,0 +1,39 @@
+# agents/reasoning_agent.py
+
+class ReasoningAgent:
+    """
+    Orchestrates planning, retrieval, summarization, and final reasoning.
+    """
+
+    def __init__(self, llm_client, retrieval_agent, summarizer_agent):
+        self.llm = llm_client
+        self.retriever = retrieval_agent
+        self.summarizer = summarizer_agent
+
+    def plan(self, query):
+        plan_prompt = (
+            "You are a legal planner for Indian law. Given the question below, "
+            "return 2-3 short numbered steps describing how you'd answer it "
+            "(identify relevant Acts/Sections, retrieve materials, summarize, reason).\n\n"
+            f"Question: {query}"
+        )
+        return self.llm.generate(plan_prompt)
+
+    def run(self, query):
+        plan = self.plan(query)
+        context = self.retriever.retrieve(query)
+        summary = self.summarizer.summarize(context)
+
+        final_prompt = (
+            "You are an expert in Indian law. Use the context summary and the retrieved materials to answer the question. "
+            "Be precise and include citations where applicable (e.g., Section 420 IPC, Act: The Coinage Act, 2011). "
+            "Respond with: 1) Short answer, 2) Reasoning/analysis, 3) Relevant citations.\n\n"
+            f"Context summary:\n{summary}\n\nQuestion: {query}"
+        )
+        answer = self.llm.generate(final_prompt)
+
+        return {
+            "plan": plan,
+            "summary": summary,
+            "answer": answer
+        }
