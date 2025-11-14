@@ -3,11 +3,7 @@ import os
 import requests
 
 class GeminiClient:
-    """
-    Minimal Gemini REST wrapper.
-    Expects GEMINI_API_KEY in env or passed to constructor.
-    Parses typical v1beta response structure.
-    """
+    
     def __init__(self, api_key: str = None, model_name: str = "gemini-2.5-flash"):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.model_name = model_name

@@ -5,7 +5,7 @@ import warnings
 
 # initialize local modules
 from agents.gemini_client import GeminiClient
-from agents.pdf_agent import build_pdf_vectorstore
+from agents.pdf_agent import build_document_vectorstore
 from agents.indiacode_agent import build_indiacode_vectorstore
 from agents.scraper_agent import build_judgment_vectorstore
 from agents.retrieval_agent import RetrievalAgent
@@ -74,17 +74,22 @@ def main():
 
     # Upload PDFs moved to main page
     st.markdown("## Upload and index your legal PDFs")
-    uploaded_pdfs = st.file_uploader("Upload PDFs", accept_multiple_files=True)
-    if uploaded_pdfs:
-        if st.button("Process PDFs"):
-            with st.spinner("Processing and indexing PDFs..."):
+    uploaded_files = st.file_uploader(
+    "Upload PDFs, Word files, or Text files",
+    type=["pdf", "docx", "txt"],
+    accept_multiple_files=True
+)
+
+    if uploaded_files:
+        if st.button("Process Documents"):
+            with st.spinner("Processing and indexing documents..."):
                 try:
-                    vs = build_pdf_vectorstore(uploaded_pdfs)
+                    vs = build_document_vectorstore(uploaded_files, gemini_api_key=GEMINI_API_KEY)
                     st.session_state.pdf_vectorstore = vs
-                    st.success("PDFs processed and indexed.")
+                    st.success("Documents processed and indexed.")
                     st.experimental_rerun()
                 except Exception as e:
-                    st.error(f"Failed to process PDFs: {e}")
+                    st.error(f"Failed to process documents: {e}")
 
     # Main Q&A input section
     st.markdown("---")
@@ -96,7 +101,7 @@ def main():
             retrieval = RetrievalAgent(
                 pdf_vectorstore=st.session_state.get("pdf_vectorstore"),
                 corpus_vectorstore=st.session_state.get("corpus_vectorstore"),
-                scraper_vectorstore=st.session_state.get("scraper_vectorstore"),
+                scraper_vectorstore=st.session_state.get("judgments_vectorstore"),
                 top_k=6
             )
             summarizer = SummarizerAgent(st.session_state.llm_client)

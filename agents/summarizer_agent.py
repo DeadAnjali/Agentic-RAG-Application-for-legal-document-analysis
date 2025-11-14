@@ -1,5 +1,4 @@
 # agents/summarizer_agent.py
-
 class SummarizerAgent:
     def __init__(self, llm_client):
         self.llm = llm_client
