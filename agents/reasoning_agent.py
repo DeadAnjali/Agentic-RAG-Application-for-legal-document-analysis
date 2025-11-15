@@ -1,10 +1,6 @@
 # agents/reasoning_agent.py
 
 class ReasoningAgent:
-    """
-    Orchestrates planning, retrieval, summarization, and final reasoning.
-    """
-
     def __init__(self, llm_client, retrieval_agent, summarizer_agent):
         self.llm = llm_client
         self.retriever = retrieval_agent
