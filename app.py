@@ -29,8 +29,8 @@ def main():
         st.session_state.pdf_vectorstore = None
     if "corpus_vectorstore" not in st.session_state:
         st.session_state.corpus_vectorstore = None
-    if "judgments_vectorstore" not in st.session_state:
-        st.session_state.judgments_vectorstore = None
+    if "scraper_vectorstore" not in st.session_state:
+        st.session_state.scraper_vectorstore = None
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "llm_client" not in st.session_state:
@@ -39,7 +39,6 @@ def main():
     # Sidebar: knowledge management (IndiaCode + Scraper + clear chat)
     with st.sidebar:
         st.subheader("Knowledge sources")
-
         st.markdown("**Load IndiaCode JSON corpus**")
         json_path = st.text_input("IndiaCode JSON path", value="data/indiacode_data.json")
         if st.button("Load IndiaCode corpus"):
@@ -61,7 +60,7 @@ def main():
                 with st.spinner("Scraping and indexing Supreme Court landmark judgments..."):
                     try:
                         vs = build_judgment_vectorstore(refresh=refresh)
-                        st.session_state.judgments_vectorstore = vs
+                        st.session_state.scraper_vectorstore = vs
                         st.success("Judgments scraped and indexed.")
                         st.experimental_rerun()
                     except Exception as e:
@@ -101,7 +100,7 @@ def main():
             retrieval = RetrievalAgent(
                 pdf_vectorstore=st.session_state.get("pdf_vectorstore"),
                 corpus_vectorstore=st.session_state.get("corpus_vectorstore"),
-                scraper_vectorstore=st.session_state.get("judgments_vectorstore"),
+                scraper_vectorstore=st.session_state.get("scraper_vectorstore"),
                 top_k=6
             )
             summarizer = SummarizerAgent(st.session_state.llm_client)
