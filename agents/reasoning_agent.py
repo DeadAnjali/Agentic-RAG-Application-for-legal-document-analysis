@@ -23,10 +23,17 @@ class ReasoningAgent:
         final_prompt = (
             "You are an expert in Indian law. Use the context summary and the retrieved materials to answer the question. "
             "Be precise and include citations where applicable (e.g., Section 420 IPC, Act: The Coinage Act, 2011). "
-            "Respond with: 1) Short answer, 2) Reasoning/analysis, 3) Relevant citations.\n\n"
+            "Respond with: Short answer and Relevant citations.\n\n"
             f"Context summary:\n{summary}\n\nQuestion: {query}"
         )
         answer = self.llm.generate(final_prompt)
+        
+        # Get IndiaCode citations if available
+        indiacode_citations = self.retriever.get_matched_acts_citations()
+        
+        # Append citations to answer if they exist
+        if indiacode_citations:
+            answer = answer + indiacode_citations
 
         return {
             "plan": plan,

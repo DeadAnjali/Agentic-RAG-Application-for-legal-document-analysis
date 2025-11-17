@@ -11,7 +11,7 @@ from agents.scraper_agent import build_judgment_vectorstore
 from agents.retrieval_agent import RetrievalAgent
 from agents.summarizer_agent import SummarizerAgent
 from agents.reasoning_agent import ReasoningAgent
-from utils.vectorstore_utils import chunk_texts
+from utils.pdf_utils import extract_text_from_documents
 from htmlTemplates import css, bot_template, user_template
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -22,19 +22,21 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 def main():
     st.set_page_config(page_title="Agentic Indian Legal RAG", page_icon="⚖️")
     st.write(css, unsafe_allow_html=True)
-    st.title("Agentic RAG — Indian Legal Assistant")
+    st.title("Agentic RAG – Indian Legal Assistant")
 
     # Session initialization
     if "pdf_vectorstore" not in st.session_state:
         st.session_state.pdf_vectorstore = None
     if "corpus_vectorstore" not in st.session_state:
         st.session_state.corpus_vectorstore = None
-    if "scraper_vectorstore" not in st.session_state:
-        st.session_state.scraper_vectorstore = None
+    if "judgments_vectorstore" not in st.session_state:
+        st.session_state.judgments_vectorstore = None
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "llm_client" not in st.session_state:
         st.session_state.llm_client = GeminiClient(api_key=GEMINI_API_KEY)
+    if "user_document_text" not in st.session_state:
+        st.session_state.user_document_text = None
 
     # Sidebar: knowledge management (IndiaCode + Scraper + clear chat)
     with st.sidebar:
@@ -60,7 +62,7 @@ def main():
                 with st.spinner("Scraping and indexing Supreme Court landmark judgments..."):
                     try:
                         vs = build_judgment_vectorstore(refresh=refresh)
-                        st.session_state.scraper_vectorstore = vs
+                        st.session_state.judgments_vectorstore = vs
                         st.success("Judgments scraped and indexed.")
                         st.experimental_rerun()
                     except Exception as e:
@@ -72,23 +74,39 @@ def main():
             st.experimental_rerun()
 
     # Upload PDFs moved to main page
-    st.markdown("## Upload and index your legal PDFs")
+    st.markdown("## Upload and index your legal documents")
+    st.markdown("*The system will automatically identify relevant Acts and fetch their full text from IndiaCode*")
+    
     uploaded_files = st.file_uploader(
-    "Upload PDFs, Word files, or Text files",
-    type=["pdf", "docx", "txt"],
-    accept_multiple_files=True
-)
+        "Upload PDFs, Word files, or Text files",
+        type=["pdf", "docx", "txt"],
+        accept_multiple_files=True
+    )
 
     if uploaded_files:
         if st.button("Process Documents"):
             with st.spinner("Processing and indexing documents..."):
                 try:
+                    # Step 1: Extract text from uploaded documents
+                    st.info("Step 1/3: Extracting text from uploaded documents...")
+                    user_text = extract_text_from_documents(uploaded_files, gemini_api_key=GEMINI_API_KEY)
+                    st.session_state.user_document_text = user_text
+                    
+                    # Step 2: Build vectorstore from documents
+                    st.info("Step 2/3: Building vector index from documents...")
                     vs = build_document_vectorstore(uploaded_files, gemini_api_key=GEMINI_API_KEY)
                     st.session_state.pdf_vectorstore = vs
-                    st.success("Documents processed and indexed.")
+                    
+                    # Step 3: Match Acts and fetch PDFs (this will happen on first query)
+                    st.info("Step 3/3: Document processing complete. Acts will be matched on first query...")
+                    
+                    st.success("✓ Documents processed and indexed successfully!")
+                    st.success("✓ Acts mentioned in your document will be automatically identified and their full text fetched from IndiaCode when you ask questions.")
                     st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Failed to process documents: {e}")
+                    import traceback
+                    st.error(traceback.format_exc())
 
     # Main Q&A input section
     st.markdown("---")
@@ -97,30 +115,45 @@ def main():
 
     if user_q:
         with st.spinner("Retrieving and reasoning..."):
-            retrieval = RetrievalAgent(
-                pdf_vectorstore=st.session_state.get("pdf_vectorstore"),
-                corpus_vectorstore=st.session_state.get("corpus_vectorstore"),
-                scraper_vectorstore=st.session_state.get("scraper_vectorstore"),
-                top_k=6
-            )
-            summarizer = SummarizerAgent(st.session_state.llm_client)
-            reasoner = ReasoningAgent(st.session_state.llm_client, retrieval, summarizer)
+            try:
+                # Create retrieval agent with user document text for Act matching
+                retrieval = RetrievalAgent(
+                    pdf_vectorstore=st.session_state.get("pdf_vectorstore"),
+                    corpus_vectorstore=st.session_state.get("corpus_vectorstore"),
+                    scraper_vectorstore=st.session_state.get("judgments_vectorstore"),
+                    top_k=6,
+                    llm_client=st.session_state.llm_client,
+                    gemini_api_key=GEMINI_API_KEY,
+                    user_document_text=st.session_state.get("user_document_text")
+                )
+                
+                summarizer = SummarizerAgent(st.session_state.llm_client)
+                reasoner = ReasoningAgent(st.session_state.llm_client, retrieval, summarizer)
 
-            out = reasoner.run(user_q)
+                out = reasoner.run(user_q)
 
-            # Store reasoning & final answer separately
-            st.session_state.chat_history.append({
-                "role": "user",
-                "content": user_q
-            })
-            st.session_state.chat_history.append({
-                "role": "bot",
-                "content": {
-                    "plan": out.get("plan", ""),
-                    "answer": out.get("answer", ""),
-                    "summary": out.get("summary", "")
-                }
-            })
+                # Store reasoning & final answer separately
+                st.session_state.chat_history.append({
+                    "role": "user",
+                    "content": user_q
+                })
+                
+                # Get IndiaCode citations if available
+                indiacode_citations = retrieval.get_matched_acts_citations()
+                
+                st.session_state.chat_history.append({
+                    "role": "bot",
+                    "content": {
+                        "plan": out.get("plan", ""),
+                        "answer": out.get("answer", ""),
+                        "summary": out.get("summary", ""),
+                        "citations": indiacode_citations
+                    }
+                })
+            except Exception as e:
+                st.error(f"Error processing query: {e}")
+                import traceback
+                st.error(traceback.format_exc())
 
     # Render chat
     for m in st.session_state.chat_history:
