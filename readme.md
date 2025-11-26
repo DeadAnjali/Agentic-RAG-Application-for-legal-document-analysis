@@ -48,22 +48,7 @@ This project is an **Agentic RAG (Retrieval-Augmented Generation)** system that 
 ---
 
 ## System Architecture (High-Level)
-Uploaded Document (PDF, DOCX, TXT)
-│
-▼
-Text Extraction
-│
-▼
-Chunking & Embeddings
-│
-▼
-Vectorstore
-│
-▼
-User Query
-│
-▼
-Reasoning Agent → Plans → Retrieves → Summarizes → Answers
+Uploaded Document (PDF, DOCX, TXT)→ Text Extraction → Chunking & Embeddings → Vectorstore → User Query → Reasoning Agent → Plans → Retrieves → Summarizes → Answers
 
 ### **How to set up the application**
 1. Create Virtual Environment
