@@ -8,7 +8,6 @@ altair==4
 tiktoken==0.4.0
 python-docx
 # uncomment to use huggingface llms
-huggingface-hub==0.14.1
 
 # uncomment to use instructor embeddings
 InstructorEmbedding==1.0.1
